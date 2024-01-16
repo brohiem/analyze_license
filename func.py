@@ -1,58 +1,25 @@
+import io
 import oci
-import uuid
-import base64
+from fdk import response
 
-# Setup basic variables
-# Auth Config
-CONFIG_PROFILE = "DEVELOPER"
-config = oci.config.from_file('~/.oci/config', CONFIG_PROFILE)
+def handler(ctx, data: io.BytesIO=None):
+    try:
+        # Initialize the AI Vision Service client with Resource Principal Signer
+        signer = oci.auth.signers.get_resource_principals_signer()
+        ai_vision_client = oci.ai_vision.AIVisionClient(config={}, signer=signer)
 
-# Compartment where processor job will be created (required)
-COMPARTMENT_ID = "ocid1.compartment.oc1..aaaaaaaa3eivxofjqulwl6odp47zp45wwfowjzgemuvqwaswvfezktuqhnga"  # e.g. "ocid1.compartment.oc1..aaaaaaaae5j73axsja5fnahbn23ilop3ynjkcg77mcvgryddz4pkh2t5ppaq";
+        # Example: Call a method from the AI Vision service (adjust as needed)
+        # For instance, analyze an image, get a model, etc.
+        # response_data = ai_vision_client.some_ai_vision_method()
+        response_data = "{\"message\":\"Good morning Christian!\"}"
 
-#sample document
-key_value_extraction_sample_string = None
-with open("licenses/nevada.jpeg", "rb") as document_file:
-    key_value_extraction_sample_string = base64.b64encode(document_file.read()).decode('utf-8')
+        return response.Response(
+            ctx, response_data=response_data,
+            headers={"Content-Type": "application/json"}
+        )
 
-def create_processor_job_callback(times_called, response):
-    print("Waiting for processor lifecycle state to go into succeeded state:", response.data)
-
-aiservicedocument_client = oci.ai_document.AIServiceDocumentClientCompositeOperations(oci.ai_document.AIServiceDocumentClient(config=config))
-
-# Document Key-Value extraction Feature
-key_value_extraction_feature = oci.ai_document.models.DocumentKeyValueExtractionFeature()
-
-# Setup the output location where processor job results will be created
-output_location = oci.ai_document.models.OutputLocation()
-output_location.namespace_name = "axoar7jjbrvk"  # e.g. "axk2tfhlrens"
-output_location.bucket_name = "bucket-20240108-1555"  # e.g "output"
-output_location.prefix = "bucket-20240108-1542/output"  # e.g "demo"
-
-# Create a processor_job for invoice key_value_extraction feature. 
-# Note: If you want to use another key value extraction feature, set document_type to "RECEIPT" "PASSPORT" or "DRIVER_ID". If you have a mix of document types, you can remove document_type
-create_processor_job_details_key_value_extraction = oci.ai_document.models.CreateProcessorJobDetails(
-                                                    display_name=str(uuid.uuid4()),
-                                                    compartment_id=COMPARTMENT_ID,
-                                                    input_location=oci.ai_document.models.InlineDocumentContent(data=key_value_extraction_sample_string),
-                                                    output_location=output_location,
-                                                    processor_config=oci.ai_document.models.GeneralProcessorConfig(features=[key_value_extraction_feature],
-                                                                                                                   document_type="DRIVER_LICENSE"))
-
-print("Calling create_processor with create_processor_job_details_key_value_extraction:", create_processor_job_details_key_value_extraction)
-create_processor_response = aiservicedocument_client.create_processor_job_and_wait_for_state(
-    create_processor_job_details=create_processor_job_details_key_value_extraction,
-    wait_for_states=[oci.ai_document.models.ProcessorJob.LIFECYCLE_STATE_SUCCEEDED],
-    waiter_kwargs={"wait_callback": create_processor_job_callback})
-
-print("processor call succeeded with status: {} and request_id: {}.".format(create_processor_response.status, create_processor_response.request_id))
-processor_job: oci.ai_document.models.ProcessorJob = create_processor_response.data
-print("create_processor_job_details_key_value_extraction response: ", create_processor_response.data)
-
-print("Getting defaultObject.json from the output_location")
-object_storage_client = oci.object_storage.ObjectStorageClient(config=config)
-get_object_response = object_storage_client.get_object(namespace_name=output_location.namespace_name,
-                                                       bucket_name=output_location.bucket_name,
-                                                       object_name="{}/{}/_/results/defaultObject.json".format(
-                                                           output_location.prefix, processor_job.id))
-print(str(get_object_response.data.content.decode()))
+    except Exception as e:
+        return response.Response(
+            ctx, response_data={"error": str(e)},
+            headers={"Content-Type": "application/json"}
+        )
