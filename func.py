@@ -1,25 +1,26 @@
 import io
+import json
 import oci
-from fdk import response
 
-def handler(ctx, data: io.BytesIO=None):
+def handle(ctx, data: io.BytesIO=None):
+    # Check if there is data in the input
+    if data is None:
+        return json.dumps({"message": "No data received"})
+
+    # Read the binary data
     try:
-        # Initialize the AI Vision Service client with Resource Principal Signer
+        binary_data = data.read()
+        size = len(binary_data)
+        
+        # Authenticate with OCI services using Resource Principal
         signer = oci.auth.signers.get_resource_principals_signer()
-        ai_vision_client = oci.ai_vision.AIVisionClient(config={}, signer=signer)
+        # Here you can use the signer to authenticate calls to other OCI services
+        
+        # Example: Call to Document Understanding API (replace with actual call)
+        # client = oci.ai_vision.AIServiceVisionClient(config={}, signer=signer)
+        # response = client.your_api_call_method()
 
-        # Example: Call a method from the AI Vision service (adjust as needed)
-        # For instance, analyze an image, get a model, etc.
-        # response_data = ai_vision_client.some_ai_vision_method()
-        response_data = "{\"message\":\"Good morning Christian!\"}"
-
-        return response.Response(
-            ctx, response_data=response_data,
-            headers={"Content-Type": "application/json"}
-        )
-
+        # For this example, we are just returning the size of the data received.
+        return json.dumps({"message": "Received binary data", "size": size})
     except Exception as e:
-        return response.Response(
-            ctx, response_data={"error": str(e)},
-            headers={"Content-Type": "application/json"}
-        )
+        return json.dumps({"error": str(e)})
